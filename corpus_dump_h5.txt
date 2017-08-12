@@ -1,0 +1,27 @@
+	@staticmethod
+	def dump(corpus):
+		corpus_dict_path = os.path.join(os.path.dirname(corpus.path),
+										corpus.filename+'.'+corpus.__class__.__name__+'.pkl.gz')
+		corpus_em_path = os.path.join(os.path.dirname(corpus.path),
+										corpus.filename+'.'+corpus.__class__.__name__+'.h5')
+		f = h5py.File(corpus_em_path,'w')
+		f['embedding_matrix'] = corpus.__dict__['embedding_matrix']
+		f.close()
+		print(corpus_em_path,
+				  ': %sGB'%round(os.path.getsize(corpus_em_path)/(1024*1024*1024),2))  
+		del corpus.__dict__['embedding_matrix']
+		with gzip.open(corpus_dict_path,'wb') as f:
+			pickle.dump(corpus.__dict__,f)
+			print(corpus_dict_path,
+				  ': %sGB'%round(os.path.getsize(corpus_dict_path)/(1024*1024*1024),2))  
+				  
+	@staticmethod
+	def load(corpus_dict_path,corpus_em_path):
+		corpus_dict_path = os.path.abspath(corpus_dict_path)
+		corpus_em_path = os.path.abspath(corpus_em_path)
+		f = h5py.Fire(corpus_em_path,'r')
+		corpus_em = f['embedding_matrix']
+		f.close()
+		with gzip.open(corpus_path,'rb') as f:
+			corpus_dict = pickle.load(f)
+		return corpus_dict,corpus_em
