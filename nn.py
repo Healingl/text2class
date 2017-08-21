@@ -69,7 +69,7 @@ class NN(object):
 				batch_size=batch_size,
 				validation_split=validation_split)
 		cls.save_to_yaml(nn)
-		cls.dump_to_pickle(nn)
+		#cls.dump_to_pickle(nn)
 		
 	@staticmethod
 	def predict():

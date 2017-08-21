@@ -4,6 +4,7 @@ import time
 import gzip
 import codecs
 import _pickle as pickle
+from functools import reduce
 
 import numpy as np
 
@@ -13,7 +14,20 @@ from keras.utils.np_utils import to_categorical
 def _to_categorical(num,max_num):
 	arr = np.zeros((1,max_num),dtype=np.int8)
 	arr[0][num] = 1
-	return arr[0]  
+	return arr[0]
+	
+def index2categorical(labels,max_num):
+	labels = list(np.array(labels).flatten())
+	num_labels = len(labels)
+	categorical = []
+	for num in range(max_num):
+		arr = np.zeros((1,max_num),dtype=np.float16) #np.int8
+		arr[0][num] = labels.count(num)/num_labels  #prior probability for each label 
+		if  np.float16(arr[0][num]) < np.float16(1e-7):
+			arr[0][num] = np.float16(1e-7)
+		# uniform distribution?
+		categorical.append(arr[0])
+	return categorical
 
 class Corpus(object):
 	'''
@@ -39,7 +53,7 @@ class Corpus(object):
 				re_labels = re.findall(self.label_pattern,line)
 				text = re.sub(self.label_pattern,'',line)
 				# if each line with multilabels
-				if re_labels != None and len(re_labels) > 0:
+				if re_labels != None and len(re_labels) > 0:# for multilabel
 					word_ids = []
 					for word in text.split(' '):#text preprocess
 						if word not in self.word_index:
@@ -51,14 +65,16 @@ class Corpus(object):
 					word_ids_length = len(word_ids)
 					if word_ids_length > self.max_text_length:
 						self.max_text_length = word_ids_length
+					self.texts.append(word_ids)
+					label_ids = []
 					for label in re_labels:
-						self.texts.append(word_ids)
 						if label not in self.label_index:
 							label_id = len(self.label_index)
 							self.label_index[label] = label_id
-							self.labels.append(label_id)
+							label_ids.append(label_id)
 						else:
-							self.labels.append(self.label_index[label])
+							label_ids.append(self.label_index[label])
+					self.labels.append(label_ids)
 		self.num_words = len(self.word_index)
 		self.texts = np.array(pad_sequences(self.texts,
 								   maxlen=self.max_text_length,
@@ -67,8 +83,18 @@ class Corpus(object):
 								   value=0),dtype=np.int32)
 		self.num_texts = len(self.texts)
 		self.num_classes = len(self.label_index)
-		#self.labels = np.array([to_categorical(label,self.num_classes)[0] for label in self.labels])
-		self.labels = np.array([_to_categorical(label,self.num_classes) for label in self.labels])
+		self.multi_label = False
+		for label_ids in self.labels:
+			if len(label_ids) > 1:
+				self.multi_label = True
+				categorical = index2categorical(self.labels,self.num_classes)
+				for index,label_ids in enumerate(self.labels):
+					arr = sum([categorical[label_id] for label_id in label_ids])
+					self.labels[index] = arr/arr.sum()  #normalized
+				self.labels = np.array(self.labels)
+				break
+		if self.multi_label == False:
+			self.labels = np.array([_to_categorical(label_ids[0],self.num_classes) for label_ids in self.labels])
 		self.num_labels = len(self.labels)
 		assert self.num_texts == self.num_labels
 		# preprocess pretrained word2vec
@@ -84,9 +110,9 @@ class Corpus(object):
 						word = values[0]
 						vectors = np.asarray(values[1:], dtype='float16')#float32
 						self.embeddings_index[word] = vectors
-						f.close()
 					except:
 						break
+				f.close()
 			self.vector_dim = len(vectors)
 			self.embedding_matrix = np.zeros((self.num_words + 1,self.vector_dim))
 			for word, index in self.word_index.items():                                 
@@ -101,23 +127,24 @@ class Corpus(object):
 		self.preprocess_time = round(time.time() - start,2)
 		
 	def summary(self):
-		print('path:',self.path,
-			  '\nfilename:',self.filename,
-			  '\nlabel_pattern:',self.label_pattern,
-			  '\nsize: %sGB'%self.size,
-			  '\nnum_texts:',self.num_texts,
-			  '\ntexts_shape:',self.texts.shape,
-			  '\nnum_labels:',self.num_labels,
-			  '\nlabels_shape:',self.labels.shape,
-			  '\nnum_words:',self.num_words,
-			  '\nnum_classes:',self.num_classes,
-			  '\nmax_text_length:',self.max_text_length,
-			  '\npreprocess_time: %ss'%self.preprocess_time
+		print('path:'.ljust(18),self.path,
+			  '\nfilename:'.ljust(18),self.filename,
+			  '\nlabel_pattern:'.ljust(18),self.label_pattern,
+			  '\nsize:'.ljust(18),'%sGB'%self.size,
+			  '\nnum_texts:'.ljust(18),self.num_texts,
+			  '\ntexts_shape:'.ljust(18),self.texts.shape,
+			  '\nnum_labels:'.ljust(18),self.num_labels,
+			  '\nlabels_shape:'.ljust(18),self.labels.shape,
+			  '\nnum_words:'.ljust(18),self.num_words,
+			  '\nnum_classes:'.ljust(18),self.num_classes,
+			  '\nmulti_label:'.ljust(18),self.multi_label,
+			  '\nmax_text_length:'.ljust(18),self.max_text_length,
+			  '\npreprocess_time:'.ljust(18),'%ss'%self.preprocess_time
 			 )
 		if not self.word2vec_path == None:
-			print('num_embeddings:',self.num_embeddings,
-				  '\nvector_dim:',self.vector_dim,
-				  '\nembedding_matrix_shape:',self.embedding_matrix_shape
+			print('num_embeddings:'.ljust(18),self.num_embeddings,
+				  '\nvector_dim:'.ljust(18),self.vector_dim,
+				  '\nmatrix_shape:'.ljust(18),self.embedding_matrix_shape
 			 )
 			 
 	@staticmethod
@@ -139,7 +166,7 @@ class Corpus(object):
 	def transform(cls,corpus):
 		corpus.preprocess()
 		corpus.summary()
-		cls.dump(corpus)
+		#cls.dump(corpus)
 		
 def main():
 	pass
