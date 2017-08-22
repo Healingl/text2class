@@ -16,6 +16,14 @@ def _to_categorical(num,max_num):
 	arr[0][num] = 1
 	return arr[0]
 	
+def index2onehot(max_num):
+	onehot = []
+	for num in range(max_num):
+		arr = np.zeros(max_num,dtype=np.int8)
+		arr[num] = 1
+		onehot.append(arr)
+	return onehot
+	
 def index2categorical(labels,max_num):
 	labels = list(np.array(labels).flatten())
 	num_labels = len(labels)
@@ -44,6 +52,7 @@ class Corpus(object):
 		self.word_index = {'__PADDING__':0}
 		self.label_index = {}
 		self.word2vec_path = word2vec_path
+		self.multi_label = False
 		
 	def preprocess(self):
 		start = time.time()
@@ -67,6 +76,8 @@ class Corpus(object):
 						self.max_text_length = word_ids_length
 					self.texts.append(word_ids)
 					label_ids = []
+					if len(re_labels) > 1 and self.multi_label == False:
+						self.multi_label = True
 					for label in re_labels:
 						if label not in self.label_index:
 							label_id = len(self.label_index)
@@ -83,18 +94,16 @@ class Corpus(object):
 								   value=0),dtype=np.int32)
 		self.num_texts = len(self.texts)
 		self.num_classes = len(self.label_index)
-		self.multi_label = False
-		for label_ids in self.labels:
-			if len(label_ids) > 1:
-				self.multi_label = True
+		if self.multi_label == True:		#multi_label
 				categorical = index2categorical(self.labels,self.num_classes)
 				for index,label_ids in enumerate(self.labels):
 					arr = sum([categorical[label_id] for label_id in label_ids])
 					self.labels[index] = arr/arr.sum()  #normalized
 				self.labels = np.array(self.labels)
-				break
-		if self.multi_label == False:
-			self.labels = np.array([_to_categorical(label_ids[0],self.num_classes) for label_ids in self.labels])
+		else:
+			onehot = index2onehot(self.num_classes)
+			self.labels = np.array([onehot[label_ids[0]] for label_ids in self.labels])
+			#self.labels = np.array([_to_categorical(label_ids[0],self.num_classes) for label_ids in self.labels])
 		self.num_labels = len(self.labels)
 		assert self.num_texts == self.num_labels
 		# preprocess pretrained word2vec
@@ -162,6 +171,41 @@ class Corpus(object):
 		with gzip.open(corpus_path,'rb') as f:
 			return pickle.load(f)
 			
+	@staticmethod
+	def test2corpus(corpus,test_path):
+		test = []
+		test_path = os.path.abspath(test_path)
+		with codecs.open(test_path,'r',encoding='utf-8') as f:
+			for line in f.readlines():
+				line = line.strip()
+				word_ids = []
+				for word in line.split(' '):#text preprocess
+					if word not in corpus.word_index:
+						word_ids.append(0)  #unlogin term 0
+					else:
+						word_ids.append(corpus.word_index[word])
+				# word_ids_length = len(word_ids)
+				# if word_ids_length > corpus.max_text_length: # over length
+					# word_ids = word_ids[:corpus.max_text_length]
+				test.append(word_ids)
+		test = np.array(pad_sequences(test,
+						   maxlen=corpus.max_text_length,
+						   padding='post',
+						   truncating='post',
+						   value=0),dtype=np.int32)
+		return test
+		
+	@staticmethod
+	def to_label(top,label_index):
+		index_label = dict(zip(label_index.values(),label_index.keys()))
+		label = []
+		for label_ids in top:
+			labels = []
+			for label_id in label_ids:
+				labels.append(index_label[label_id])
+			label.append(labels)
+		return label
+	
 	@classmethod
 	def transform(cls,corpus):
 		corpus.preprocess()

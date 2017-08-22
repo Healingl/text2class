@@ -1,5 +1,5 @@
 import fire
-
+import codecs
 import numpy as np
 
 from nn import NN
@@ -18,19 +18,23 @@ class TextCNN(NN):
 	def __init__(self,
 					embedding_dim=None,
 					trainable=True,
-					num_filters=100,
-					filter_sizes=[2,3,4],
 					dropout_rate=0.5,
 					optimizer='Adadelta',
-					**corpus_dict):
-		self.vocab_size = corpus_dict['num_words']
-		self.num_classes = corpus_dict['num_classes']
-		self.input_length = corpus_dict['max_text_length']
-		self.embedding_matrix = corpus_dict['embedding_matrix']
+					**kwargs):
+		self.vocab_size = kwargs['num_words']
+		self.num_classes = kwargs['num_classes']
+		self.input_length = kwargs['max_text_length']
+		self.embedding_matrix = kwargs['embedding_matrix']
 		self.embedding_dim = embedding_dim
 		self.trainable = trainable
-		self.num_filters = num_filters
-		self.filter_sizes = filter_sizes
+		if 'num_filters' in kwargs:
+			self.num_filters = kwargs['num_filters']
+		else:
+			self.num_filters = 100
+		if 'filter_sizes' in kwargs:
+			self.filter_sizes = kwargs['filter_sizes']
+		else:
+			self.filter_sizes = [2,3,4]
 		self.dropout_rate = dropout_rate
 		self.optimizer = optimizer
 		
@@ -84,44 +88,9 @@ class TextCNN(NN):
 			self.model.compile(loss='categorical_crossentropy', 
 						  optimizer=self.optimizer,
 						  metrics=['acc'])  
-				
-def main(corpus_source_path=None,
-			word2vec_path=None,
-			corpus_object_path=None,
-			label_pattern='__label__([\-\w]+)',
-			embedding_dim=None,
-			trainable=True,
-			num_filters=100,
-			filter_sizes=[3,4,5],
-			dropout_rate=0.5,
-			optimizer='Adadelta',
-			epochs=5,
-			batch_size=128,
-			validation_split=0.1):
-	if word2vec_path == None and embedding_dim == None and corpus_object_path == None:
-		print('please input embedding_dim!')
-		return
-	if corpus_source_path == None and corpus_object_path == None:
-		print('please input corpus_source_path or corpus_object_path!')
-		return
-	if corpus_object_path == None:
-		corpus = Corpus(corpus_source_path,word2vec_path)
-		Corpus.transform(corpus)
-	else:
-		corpus = Corpus.load(corpus_object_path)
-	tc = TextCNN(embedding_dim=embedding_dim,
-				trainable=trainable,
-				num_filters=num_filters,
-				filter_sizes=filter_sizes, 
-				dropout_rate=dropout_rate,
-				optimizer=optimizer,
-				**corpus.__dict__)
-	TextCNN.train(tc,
-					corpus.texts,
-					corpus.labels,
-					epochs=epochs,
-					batch_size=batch_size,
-					validation_split=validation_split)
-				
+
 if __name__ == '__main__':
-	fire.Fire(main)
+	fire.Fire({
+	'train': TextCNN.train,
+	'predict': TextCNN.predict,
+	})
