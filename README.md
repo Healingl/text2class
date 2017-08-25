@@ -7,7 +7,7 @@ deep learning for text classification in keras
 - tensorflow 1.2
 
 ## demo
-### 1.input  
+#### 1.input  
 each line with one or multiple(for multi-label classification) tag prefix like \_\_label__
 ```
 head -n 1 gs.txt
