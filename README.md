@@ -125,7 +125,7 @@ Usage:       text_cnn.py train CORPUS_SOURCE_PATH
                                [--epochs EPOCHS] 
                                [--batch-size BATCH_SIZE] 
                                [--validation-split VALIDATION_SPLIT] 
-                               [--KWARGS ...] # for text_cnn : --num-filters NUM_FILTERS --filter-sizes FILTER_SIZES
+                               [--KWARGS ...] # text_cnn : --num-filters NUM_FILTERS --filter-sizes FILTER_SIZES
 ```
 ## predict
 ```
