@@ -1,6 +1,11 @@
 # text2class
 deep learning for text classification in keras
 
+## dependency
+- python3
+- keras 2.0.2
+- tensorflow 1.2
+
 ## demo
 ### 1.input  
 each line with one or multiple(for multi-label classification) tag prefix like \_\_label__
@@ -9,6 +14,7 @@ head -n 1 gs.txt
 __label__0 , In New York City, U.S. district court judge Thomas twould violate ......
 ```
 #### 2.train
+without pretrained word vectors , you should specify like --embedding-dim 256
 ```
 python text_cnn.py train gs.txt gensim.glove.twitter.27B.200d.txt --num-filters 100 --filter-sizes 3,4,5
 
